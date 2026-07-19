@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Nonogram">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#FFFFFF">
+<meta name="theme-color" content="#F2F2F2">
 <title>Nonogram</title>
 <style>
   :root{
@@ -27,13 +27,13 @@
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{
-    margin:0; padding:0; background:var(--paper); color:var(--ink);
+    margin:0; padding:0; background:var(--paper-soft); color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     overscroll-behavior:none;
     -webkit-user-select:none; user-select:none;
   }
   .wrap{
-    max-width:560px; margin:0 auto; padding:14px 12px calc(24px + env(safe-area-inset-bottom));
+    max-width:560px; margin:0 auto; padding:14px 12px calc(146px + env(safe-area-inset-bottom));
     min-height:100vh;
   }
   header{ text-align:center; margin-bottom:10px; }
@@ -61,7 +61,11 @@
   .clue{
     display:flex; align-items:center; justify-content:center;
     font-weight:800; color:var(--clue-text); font-size:calc(var(--cell) * 0.44);
-    line-height:1; background:var(--clue-bg);
+    line-height:1; background:var(--clue-bg); cursor:pointer;
+  }
+  .clue.labelDone{
+    text-decoration:line-through; text-decoration-thickness:2px;
+    opacity:0.38;
   }
   .cell{
     width:var(--cell); height:var(--cell);
@@ -86,6 +90,23 @@
 
   .cell.wrongExtra{ box-shadow: inset 0 0 0 3px var(--error); }
 
+  .cell:active{ transform:scale(0.88); transition:transform 0.06s; }
+
+  .boardCard{
+    background:#fff; border-radius:20px; padding:16px 8px 20px;
+    box-shadow:0 8px 24px rgba(30,20,60,0.10);
+    margin:4px 0 16px;
+  }
+
+  .btnBar{
+    position:fixed; left:0; right:0; bottom:0; z-index:40;
+    background:#fff; border-top:1px solid #E7E7EF;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    box-shadow:0 -6px 18px rgba(0,0,0,0.06);
+  }
+  .btnBar .btnRow{ max-width:536px; margin:0 auto; }
+  .btnBar .btnRow2{ max-width:536px; margin:8px auto 0; display:flex; }
+
   .btnRow{
     display:flex; gap:8px; margin-top:6px;
   }
@@ -98,12 +119,43 @@
   button.primary{
     background:var(--accent); border-color:var(--accent-dark); color:#fff;
   }
+  button.helpBtn{
+    flex:1; padding:11px 6px; font-size:13.5px; font-weight:700; border-radius:12px;
+    border:2px solid var(--clue-text); background:var(--clue-bg); color:var(--clue-text);
+    font-family:inherit;
+  }
+  button.helpBtn:active{ transform:scale(0.97); }
   .legend{
     display:flex; gap:14px; justify-content:center; margin-top:10px; font-size:11.5px; color:#6b6a5f;
     flex-wrap:wrap;
   }
   .legend span{ display:inline-flex; align-items:center; gap:5px; }
   .swatch{ width:11px; height:11px; border-radius:3px; display:inline-block; }
+
+  #helpOverlay{
+    position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    z-index:70; padding:20px; background:rgba(20,18,35,0.55);
+  }
+  #helpOverlay.show{ display:flex; }
+  #helpCard{
+    background:#fff; border-radius:18px; padding:22px 20px;
+    max-width:420px; width:100%; max-height:82vh; overflow-y:auto;
+    box-shadow:0 20px 50px rgba(0,0,0,0.3);
+    position:relative;
+  }
+  #helpCard h2{
+    margin:0 0 12px; font-size:19px; color:var(--clue-text);
+  }
+  #helpCard p, #helpCard li{
+    font-size:14.5px; line-height:1.9; color:var(--ink);
+  }
+  #helpCard ol{ margin:0 0 12px; padding-right:20px; padding-left:0; }
+  #helpCard p{ margin:0 0 12px; }
+  #helpClose{
+    position:absolute; top:10px; left:10px; width:32px; height:32px; border-radius:50%;
+    border:none; background:var(--paper-soft); color:var(--ink); font-size:18px; font-weight:700;
+    cursor:pointer; line-height:1;
+  }
 
   #confettiCanvas{
     position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:60;
@@ -132,23 +184,72 @@
 <div class="wrap">
   <header>
     <h1>Nonogram</h1>
-    <p class="sub">Tap a cell: black → ✕ → clear</p>
+    <p class="sub">Tap a cell: fill → X → clear</p>
   </header>
 
   <div id="status"></div>
 
-  <div id="boardWrap">
-    <div id="puzzle"></div>
+  <div class="boardCard">
+    <div id="boardWrap">
+      <div id="puzzle"></div>
+    </div>
   </div>
 
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--error)"></span>incorrect fill</span>
+  </div>
+</div>
+
+<div class="btnBar">
   <div class="btnRow">
     <button class="act" id="btnStart">Start Over</button>
     <button class="act primary" id="btnDone">Done</button>
     <button class="act" id="btnNew">New Puzzle</button>
   </div>
+  <div class="btnRow2">
+    <button class="helpBtn" id="btnHelp">راهنمای حل نونوگرام</button>
+  </div>
+</div>
 
-  <div class="legend">
-    <span><span class="swatch" style="background:var(--error)"></span>incorrect fill</span>
+<div id="helpOverlay">
+  <div id="helpCard" dir="rtl" lang="fa">
+    <button id="helpClose" aria-label="close">×</button>
+    <h2>چگونه نونوگرام را حل کنیم؟</h2>
+    <p>
+      نونوگرام یک پازل تصویری است. عددهای کنار هر سطر و ستون نشان می‌دهند که در آن سطر یا ستون
+      چند بلوک از خانه‌های پر شده وجود دارد و هر بلوک چند خانه‌ی پشت‌سرهم است. ترتیب عددها از چپ
+      به راست برای سطرها و از بالا به پایین برای ستون‌ها، همان ترتیب قرارگیری بلوک‌هاست. بین هر
+      دو بلوک متوالی حداقل یک خانه‌ی خالی لازم است.
+    </p>
+    <ol>
+      <li>
+        اول سراغ خطوطی بروید که جواب‌شان قطعی است: اگر مجموع عددهای یک سطر به‌علاوه‌ی حداقل
+        فاصله‌های لازم بین آن‌ها، دقیقاً برابر طول کل سطر باشد، جای همه‌ی بلوک‌ها مشخص است و
+        می‌توانید کل سطر را همان‌جا پر کنید.
+      </li>
+      <li>
+        از روش هم‌پوشانی استفاده کنید: وقتی یک بلوک نسبت به طول خط بزرگ است، حتی اگر جای دقیق
+        آن را ندانید، بخشی از وسط آن قطعاً پر خواهد بود.
+      </li>
+      <li>
+        خانه‌هایی را که مطمئنید باید خالی بمانند، ضربدر بزنید. این کار فضای باقی‌مانده برای
+        بلوک‌های دیگر را واضح‌تر می‌کند.
+      </li>
+      <li>
+        سطر و ستون را با هم در نظر بگیرید: هر خانه‌ای که در یک سطر پر یا خالی می‌شود، همان
+        اطلاعات را به ستون مربوطه هم می‌دهد و برعکس.
+      </li>
+      <li>
+        اگر جایی گیر کردید، سراغ سطر یا ستون دیگری بروید؛ اطلاعات تازه معمولاً به حل قسمت‌های
+        قبلی هم کمک می‌کند.
+      </li>
+    </ol>
+    <p>
+      در این اپ، با هر ضربه روی یک خانه، حالت آن عوض می‌شود: خانه‌ی خالی پر می‌شود، ضربه‌ی دوم
+      آن را ضربدر می‌زند و ضربه‌ی سوم دوباره خالی‌اش می‌کند. وقتی سطر یا ستونی را کامل و درست پر
+      کردید، می‌توانید روی عدد کنار آن ضربه بزنید تا آن خط خط‌خورده علامت زده شود؛ اگر واقعاً
+      درست باشد، بقیه‌ی خانه‌های خالی آن به‌طور خودکار ضربدر می‌خورند.
+    </p>
   </div>
 </div>
 
@@ -353,6 +454,8 @@ const ORIGINAL_SOLUTION = [
 const N=15, M=15;
 let puzzle = { rowClues:ORIGINAL_ROW_CLUES, colClues:ORIGINAL_COL_CLUES, solution:ORIGINAL_SOLUTION };
 let cellState = Array.from({length:N},()=>new Array(M).fill(0)); // 0 empty,1 filled,2 crossed
+let rowDone = new Array(N).fill(false);
+let colDone = new Array(M).fill(false);
 
 const puzzleEl = document.getElementById('puzzle');
 const statusEl = document.getElementById('status');
@@ -389,6 +492,9 @@ function render(){
       d.style.gridColumn = (LC+c+1);
       d.style.gridRow = (LR-len+k+1);
       d.innerHTML = `<span>${clue[k]}</span>`;
+      d.dataset.col = c;
+      if(colDone[c]) d.classList.add('labelDone');
+      d.addEventListener('click', ()=>toggleColDone(c));
       puzzleEl.appendChild(d);
     }
   }
@@ -402,6 +508,9 @@ function render(){
       d.style.gridColumn = (LC-len+k+1);
       d.style.gridRow = (LR+r+1);
       d.innerHTML = `<span>${clue[k]}</span>`;
+      d.dataset.row = r;
+      if(rowDone[r]) d.classList.add('labelDone');
+      d.addEventListener('click', ()=>toggleRowDone(r));
       puzzleEl.appendChild(d);
     }
   }
@@ -540,6 +649,47 @@ celebrateEl.addEventListener('click', ()=>{
   clearTimeout(launchCelebration._t);
 });
 
+function rowIsCorrect(r){
+  for(let c=0;c<M;c++){
+    const should = puzzle.solution[r][c]===1;
+    const is = cellState[r][c]===1;
+    if(should!==is) return false;
+  }
+  return true;
+}
+function colIsCorrect(c){
+  for(let r=0;r<N;r++){
+    const should = puzzle.solution[r][c]===1;
+    const is = cellState[r][c]===1;
+    if(should!==is) return false;
+  }
+  return true;
+}
+function autoCrossRow(r){
+  for(let c=0;c<M;c++){
+    if(cellState[r][c]===0) cellState[r][c]=2;
+  }
+}
+function autoCrossCol(c){
+  for(let r=0;r<N;r++){
+    if(cellState[r][c]===0) cellState[r][c]=2;
+  }
+}
+function toggleRowDone(r){
+  rowDone[r] = !rowDone[r];
+  if(rowDone[r] && rowIsCorrect(r)){
+    autoCrossRow(r);
+  }
+  render();
+}
+function toggleColDone(c){
+  colDone[c] = !colDone[c];
+  if(colDone[c] && colIsCorrect(c)){
+    autoCrossCol(c);
+  }
+  render();
+}
+
 function onCellTap(e){
   const r=+e.currentTarget.dataset.r, c=+e.currentTarget.dataset.c;
   cellState[r][c] = (cellState[r][c]+1)%3;
@@ -560,6 +710,8 @@ function clearErrorHighlights(){
 
 document.getElementById('btnStart').addEventListener('click', ()=>{
   cellState = Array.from({length:N},()=>new Array(M).fill(0));
+  rowDone = new Array(N).fill(false);
+  colDone = new Array(M).fill(false);
   celebrated = false;
   clearErrorHighlights();
   hideStatus();
@@ -604,6 +756,8 @@ document.getElementById('btnNew').addEventListener('click', ()=>{
     puzzle = generatePuzzle(N,M,Date.now()+1);
   }
   cellState = Array.from({length:N},()=>new Array(M).fill(0));
+  rowDone = new Array(N).fill(false);
+  colDone = new Array(M).fill(false);
   celebrated = false;
   hideStatus();
   render();
@@ -612,6 +766,17 @@ document.getElementById('btnNew').addEventListener('click', ()=>{
 window.addEventListener('resize', ()=>{
   const {LC,LR}=labelCounts();
   sizeBoard(LC,LR);
+});
+
+const helpOverlay = document.getElementById('helpOverlay');
+document.getElementById('btnHelp').addEventListener('click', ()=>{
+  helpOverlay.classList.add('show');
+});
+document.getElementById('helpClose').addEventListener('click', ()=>{
+  helpOverlay.classList.remove('show');
+});
+helpOverlay.addEventListener('click', (e)=>{
+  if(e.target === helpOverlay) helpOverlay.classList.remove('show');
 });
 
 render();
