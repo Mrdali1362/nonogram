@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Nonogram">
+<meta name="apple-mobile-web-app-title" content="نونوگرام">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#F2F2F2">
-<title>Nonogram</title>
+<title>نونوگرام</title>
 <style>
   :root{
     --paper:#FFFFFF;
@@ -33,14 +33,13 @@
     -webkit-user-select:none; user-select:none;
   }
   .wrap{
-    max-width:560px; margin:0 auto; padding:14px 12px calc(146px + env(safe-area-inset-bottom));
-    min-height:100vh;
+    max-width:560px; margin:0 auto; padding:14px 12px 24px;
   }
   header{ text-align:center; margin-bottom:10px; }
   h1{
     font-size:22px; margin:2px 0 2px; letter-spacing:0.02em; font-weight:800;
   }
-  .sub{ font-size:12.5px; color:#6b6a5f; margin:0; }
+  .sub{ font-size:15px; color:#6b6a5f; margin:0; }
 
   #status{
     min-height:20px; text-align:center; font-size:14px; font-weight:600;
@@ -99,16 +98,19 @@
   }
 
   .btnBar{
-    position:fixed; left:0; right:0; bottom:0; z-index:40;
     background:#fff; border-top:1px solid #E7E7EF;
-    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-    box-shadow:0 -6px 18px rgba(0,0,0,0.06);
+    padding:14px 12px calc(14px + env(safe-area-inset-bottom));
+    margin-top:10px;
   }
-  .sizeToggle{
-    display:flex; gap:8px; justify-content:center; margin:2px 0 12px;
+  .controlsToggle{
+    display:flex; gap:8px; justify-content:center; align-items:center;
+    flex-wrap:wrap; margin:2px 0 6px;
+  }
+  .toggleDivider{
+    width:1px; align-self:stretch; background:#D8D8E2; margin:2px 2px;
   }
   .sizeBtn{
-    padding:8px 20px; font-size:13.5px; font-weight:700; border-radius:999px;
+    padding:9px 20px; font-size:16px; font-weight:700; border-radius:999px;
     border:2px solid var(--clue-text); background:var(--paper); color:var(--clue-text);
     font-family:inherit; cursor:pointer;
   }
@@ -117,11 +119,8 @@
   }
   .sizeBtn:active{ transform:scale(0.96); }
 
-  .diffToggle{
-    display:flex; gap:6px; justify-content:center; margin:0 0 4px; flex-wrap:wrap;
-  }
   .diffBtn{
-    padding:7px 14px; font-size:12.5px; font-weight:700; border-radius:999px;
+    padding:8px 15px; font-size:15px; font-weight:700; border-radius:999px;
     border:2px solid var(--clue-text); background:var(--paper); color:var(--clue-text);
     font-family:inherit; cursor:pointer;
   }
@@ -131,7 +130,7 @@
   }
   .diffBtn:active{ transform:scale(0.96); }
   .unlockHint{
-    text-align:center; font-size:11.5px; color:#8A8A97; margin:0 0 10px;
+    text-align:center; font-size:14px; color:#7a7a87; margin:0 0 10px;
   }
   .unlockHint.hidden{ display:none; }
   .btnBar .btnRow{ max-width:536px; margin:0 auto; }
@@ -141,7 +140,7 @@
     display:flex; gap:8px; margin-top:6px;
   }
   button.act{
-    flex:1; padding:13px 6px; font-size:14px; font-weight:700; border-radius:12px;
+    flex:1; padding:13px 6px; font-size:16px; font-weight:700; border-radius:12px;
     border:2px solid var(--ink); background:var(--paper); color:var(--ink);
     font-family:inherit; letter-spacing:0.01em;
   }
@@ -150,17 +149,17 @@
     background:var(--accent); border-color:var(--accent-dark); color:#fff;
   }
   button.helpBtn{
-    flex:1; padding:11px 6px; font-size:13.5px; font-weight:700; border-radius:12px;
+    flex:1; padding:11px 6px; font-size:15px; font-weight:700; border-radius:12px;
     border:2px solid var(--clue-text); background:var(--clue-bg); color:var(--clue-text);
     font-family:inherit;
   }
   button.helpBtn:active{ transform:scale(0.97); }
   .legend{
-    display:flex; gap:14px; justify-content:center; margin-top:10px; font-size:11.5px; color:#6b6a5f;
+    display:flex; gap:14px; justify-content:center; margin-top:10px; font-size:14px; color:#6b6a5f;
     flex-wrap:wrap;
   }
   .legend span{ display:inline-flex; align-items:center; gap:5px; }
-  .swatch{ width:11px; height:11px; border-radius:3px; display:inline-block; }
+  .swatch{ width:13px; height:13px; border-radius:3px; display:inline-block; }
 
   #helpOverlay{
     position:fixed; inset:0; display:none; align-items:center; justify-content:center;
@@ -213,40 +212,35 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Nonogram</h1>
-    <p class="sub">Tap a cell: fill → X → clear</p>
+    <h1>نونوگرام</h1>
+    <p class="sub">لمس خانه: پر ← ضربدر ← خالی</p>
   </header>
 
-  <div class="sizeToggle">
-    <button class="sizeBtn" id="size10" data-size="10">10×10</button>
-    <button class="sizeBtn active" id="size15" data-size="15">15×15</button>
+  <div class="controlsToggle">
+    <button class="sizeBtn active" id="size10" data-size="10">10×10</button>
+    <button class="sizeBtn" id="size15" data-size="15">15×15</button>
+    <span class="toggleDivider"></span>
+    <button class="diffBtn active" id="diffEasy" data-diff="easy">آسان</button>
+    <button class="diffBtn locked" id="diffMedium" data-diff="medium">متوسط 🔒</button>
+    <button class="diffBtn locked" id="diffChallenging" data-diff="challenging">دشوار 🔒</button>
   </div>
-
-  <div class="diffToggle">
-    <button class="diffBtn active" id="diffEasy" data-diff="easy">Easy</button>
-    <button class="diffBtn locked" id="diffMedium" data-diff="medium">Medium 🔒</button>
-    <button class="diffBtn locked" id="diffChallenging" data-diff="challenging">Challenging 🔒</button>
-  </div>
-  <p class="unlockHint" id="unlockHint">Solve 5 Easy puzzles to unlock Medium &amp; Challenging (0/5)</p>
+  <p class="unlockHint" id="unlockHint">برای باز شدن سطح متوسط و دشوار، ۵ پازل آسان حل کنید (0/5)</p>
 
   <div id="status"></div>
 
   <div class="boardCard">
-    <div id="boardWrap">
+    <div id="boardWrap" dir="ltr">
       <div id="puzzle"></div>
     </div>
   </div>
 
-  <div class="legend">
-    <span><span class="swatch" style="background:var(--error)"></span>incorrect fill</span>
-  </div>
 </div>
 
 <div class="btnBar">
   <div class="btnRow">
-    <button class="act" id="btnStart">Start Over</button>
-    <button class="act primary" id="btnDone">Done</button>
-    <button class="act" id="btnNew">New Puzzle</button>
+    <button class="act" id="btnStart">شروع دوباره</button>
+    <button class="act primary" id="btnDone">بررسی</button>
+    <button class="act" id="btnNew">پازل جدید</button>
   </div>
   <div class="btnRow2">
     <button class="helpBtn" id="btnHelp">راهنمای حل نونوگرام</button>
@@ -255,7 +249,7 @@
 
 <div id="helpOverlay">
   <div id="helpCard" dir="rtl" lang="fa">
-    <button id="helpClose" aria-label="close">×</button>
+    <button id="helpClose" aria-label="بستن">×</button>
     <h2>چگونه نونوگرام را حل کنیم؟</h2>
     <p>
       نونوگرام یک پازل تصویری است. عددهای کنار هر سطر و ستون نشان می‌دهند که در آن سطر یا ستون
@@ -298,8 +292,8 @@
 <canvas id="confettiCanvas"></canvas>
 <div id="celebrate">
   <div id="celebrateCard">
-    <h2>🎉 Solved!</h2>
-    <p>Nice work — tap anywhere to close.</p>
+    <h2>🎉 حل شد!</h2>
+    <p>آفرین! برای بستن، هر جا لمس کنید.</p>
   </div>
 </div>
 
@@ -538,11 +532,11 @@ const ORIGINAL_SOLUTION = [
 
 /* =================== app state / rendering =================== */
 
-let N=15, M=15;
+let N=10, M=10;
 let currentDifficulty = 'easy';
 let easySolvedCount = 0;
 const UNLOCK_THRESHOLD = 5;
-let puzzle = { rowClues:ORIGINAL_ROW_CLUES, colClues:ORIGINAL_COL_CLUES, solution:ORIGINAL_SOLUTION };
+let puzzle = generatePuzzle(N, M, Date.now(), currentDifficulty);
 let cellState = Array.from({length:N},()=>new Array(M).fill(0)); // 0 empty,1 filled,2 crossed
 let rowDone = new Array(N).fill(false);
 let colDone = new Array(M).fill(false);
@@ -659,7 +653,7 @@ function maybeCelebrate(){
       clearErrorHighlights();
       statusEl.classList.add('show','ok');
       statusEl.classList.remove('bad');
-      statusEl.textContent = 'Solved correctly! 🎉';
+      statusEl.textContent = 'درست حل شد! 🎉';
       onPuzzleSolved();
     }
   } else {
@@ -831,18 +825,18 @@ document.getElementById('btnDone').addEventListener('click', ()=>{
     celebrated = false;
     statusEl.classList.add('bad');
     statusEl.classList.remove('ok');
-    statusEl.textContent = `${wrong} filled cell${wrong===1?'':'s'} ${wrong===1?'is':'are'} incorrect (see highlights below)`;
+    statusEl.textContent = `${wrong} خانه‌ی پرشده اشتباه است (خانه‌های مشخص‌شده را ببینید)`;
   } else if(isSolved()){
     statusEl.classList.add('ok');
     statusEl.classList.remove('bad');
-    statusEl.textContent = 'Solved correctly! 🎉';
+    statusEl.textContent = 'درست حل شد! 🎉';
     if(!celebrated){
       onPuzzleSolved();
     }
   } else {
     statusEl.classList.add('ok');
     statusEl.classList.remove('bad');
-    statusEl.textContent = 'All correct so far — keep going!';
+    statusEl.textContent = 'تا اینجا همه چیز درست است — ادامه بده!';
   }
 });
 
@@ -892,7 +886,7 @@ function updateUnlockUI(){
     const diff = b.dataset.diff;
     if(diff !== 'easy'){
       b.classList.toggle('locked', !isUnlocked);
-      b.textContent = (diff==='medium' ? 'Medium' : 'Challenging') + (isUnlocked ? '' : ' 🔒');
+      b.textContent = (diff==='medium' ? 'متوسط' : 'دشوار') + (isUnlocked ? '' : ' 🔒');
     }
     b.classList.toggle('active', diff === currentDifficulty);
   });
@@ -900,7 +894,7 @@ function updateUnlockUI(){
     unlockHint.classList.add('hidden');
   } else {
     unlockHint.classList.remove('hidden');
-    unlockHint.textContent = `Solve 5 Easy puzzles to unlock Medium & Challenging (${easySolvedCount}/${UNLOCK_THRESHOLD})`;
+    unlockHint.textContent = `برای باز شدن سطح متوسط و دشوار، ۵ پازل آسان حل کنید (${easySolvedCount}/${UNLOCK_THRESHOLD})`;
   }
 }
 diffButtons.forEach(b=>{
