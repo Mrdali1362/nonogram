@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nonogram">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FFFFFF">
+<title>Nonogram</title>
+<style>
+  :root{
+    --paper:#FFFFFF;
+    --paper-soft:#F2F2F2;
+    --ink:#242420;
+    --line:#D9DCEC;
+    --line-thick:#000000;
+    --fill:#354962;
+    --cross:#354962;
+    --clue-bg:#EBEDF9;
+    --clue-text:#2C2359;
+    --accent:#2C2359;
+    --accent-dark:#1D1740;
+    --error:#B4392E;
+    --cell:22px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{
+    margin:0; padding:0; background:var(--paper); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overscroll-behavior:none;
+    -webkit-user-select:none; user-select:none;
+  }
+  .wrap{
+    max-width:560px; margin:0 auto; padding:14px 12px calc(24px + env(safe-area-inset-bottom));
+    min-height:100vh;
+  }
+  header{ text-align:center; margin-bottom:10px; }
+  h1{
+    font-size:22px; margin:2px 0 2px; letter-spacing:0.02em; font-weight:800;
+  }
+  .sub{ font-size:12.5px; color:#6b6a5f; margin:0; }
+
+  #status{
+    min-height:20px; text-align:center; font-size:14px; font-weight:600;
+    margin:10px 4px 8px; padding:8px 10px; border-radius:10px;
+    display:none;
+  }
+  #status.show{ display:block; }
+  #status.ok{ background:#DEEAE3; color:var(--accent-dark); }
+  #status.bad{ background:#F3DEDB; color:var(--error); }
+
+  #boardWrap{
+    width:100%; display:flex; justify-content:center; margin:6px 0 16px; overflow-x:auto;
+  }
+  #puzzle{
+    display:grid;
+    background:var(--paper);
+  }
+  .clue{
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; color:var(--clue-text); font-size:calc(var(--cell) * 0.44);
+    line-height:1; background:var(--clue-bg);
+  }
+  .cell{
+    width:var(--cell); height:var(--cell);
+    border-right:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    position:relative; background:var(--paper);
+    touch-action:manipulation;
+  }
+  .cell.filled{ background:var(--fill); }
+  .cell.crossed::before, .cell.crossed::after{
+    content:""; position:absolute; width:64%; height:12%; background:var(--cross);
+    top:50%; left:50%; border-radius:2px;
+  }
+  .cell.crossed::before{ transform:translate(-50%,-50%) rotate(45deg); }
+  .cell.crossed::after{ transform:translate(-50%,-50%) rotate(-45deg); }
+
+  .cell.thickR{ border-right:3px solid var(--line-thick); }
+  .cell.thickB{ border-bottom:3px solid var(--line-thick); }
+  .cell.edgeT{ border-top:1px solid var(--line); }
+  .cell.edgeL{ border-left:1px solid var(--line); }
+
+  .cell.wrongExtra{ box-shadow: inset 0 0 0 3px var(--error); }
+
+  .btnRow{
+    display:flex; gap:8px; margin-top:6px;
+  }
+  button.act{
+    flex:1; padding:13px 6px; font-size:14px; font-weight:700; border-radius:12px;
+    border:2px solid var(--ink); background:var(--paper); color:var(--ink);
+    font-family:inherit; letter-spacing:0.01em;
+  }
+  button.act:active{ transform:scale(0.97); }
+  button.primary{
+    background:var(--accent); border-color:var(--accent-dark); color:#fff;
+  }
+  .legend{
+    display:flex; gap:14px; justify-content:center; margin-top:10px; font-size:11.5px; color:#6b6a5f;
+    flex-wrap:wrap;
+  }
+  .legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .swatch{ width:11px; height:11px; border-radius:3px; display:inline-block; }
+
+  #confettiCanvas{
+    position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:60;
+  }
+  #celebrate{
+    position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    z-index:61; padding:20px; background:rgba(36,36,32,0);
+  }
+  #celebrate.show{ display:flex; }
+  #celebrateCard{
+    background:#fff; border:3px solid var(--ink); border-radius:18px;
+    padding:26px 34px; text-align:center; max-width:300px;
+    box-shadow:0 14px 34px rgba(0,0,0,0.22);
+    animation: popIn 0.5s cubic-bezier(.34,1.56,.64,1);
+  }
+  #celebrateCard h2{ margin:0 0 6px; font-size:26px; }
+  #celebrateCard p{ margin:0; font-size:13px; color:#6b6a5f; }
+  @keyframes popIn{
+    0%{ transform:scale(0.35) rotate(-8deg); opacity:0; }
+    65%{ transform:scale(1.1) rotate(3deg); opacity:1; }
+    100%{ transform:scale(1) rotate(0deg); opacity:1; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Nonogram</h1>
+    <p class="sub">Tap a cell: black → ✕ → clear</p>
+  </header>
+
+  <div id="status"></div>
+
+  <div id="boardWrap">
+    <div id="puzzle"></div>
+  </div>
+
+  <div class="btnRow">
+    <button class="act" id="btnStart">Start Over</button>
+    <button class="act primary" id="btnDone">Done</button>
+    <button class="act" id="btnNew">New Puzzle</button>
+  </div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--error)"></span>incorrect fill</span>
+  </div>
+</div>
+
+<canvas id="confettiCanvas"></canvas>
+<div id="celebrate">
+  <div id="celebrateCard">
+    <h2>🎉 Solved!</h2>
+    <p>Nice work — tap anywhere to close.</p>
+  </div>
+</div>
+
+<script>
+/* =================== core nonogram logic =================== */
+
+function genLines(clue, length){
+  if(clue.length===0 || (clue.length===1 && clue[0]===0)) return [new Array(length).fill(0)];
+  const k=clue.length;
+  const total=clue.reduce((a,b)=>a+b,0);
+  const slack=length-(total+(k-1));
+  if(slack<0) return [];
+  const results=[];
+  function distribute(remaining,parts,current,cb){
+    if(parts===1){ cb(current.concat([remaining])); return; }
+    for(let v=0; v<=remaining; v++) distribute(remaining-v,parts-1,current.concat([v]),cb);
+  }
+  distribute(slack,k+1,[],(extraGaps)=>{
+    const line=[];
+    for(let i=0;i<k;i++){
+      const g=extraGaps[i]+(i>0?1:0);
+      for(let j=0;j<g;j++) line.push(0);
+      for(let j=0;j<clue[i];j++) line.push(1);
+    }
+    for(let j=0;j<extraGaps[k];j++) line.push(0);
+    results.push(line);
+  });
+  return results;
+}
+
+function runsOf(line){
+  const res=[]; let cnt=0;
+  for(const v of line){ if(v===1) cnt++; else { if(cnt>0) res.push(cnt); cnt=0; } }
+  if(cnt>0) res.push(cnt);
+  return res.length?res:[0];
+}
+
+function consistent(line,known){
+  for(let i=0;i<line.length;i++){
+    if(known[i]!==null && known[i]!==undefined && line[i]!==known[i]) return false;
+  }
+  return true;
+}
+
+function propagate(rowClues,colClues,initialGrid){
+  const N=rowClues.length, M=colClues.length;
+  const grid = initialGrid ? initialGrid.map(r=>r.slice()) : Array.from({length:N},()=>new Array(M).fill(null));
+  let rowOptions = rowClues.map((c,i)=>genLines(c,M).filter(o=>consistent(o,grid[i])));
+  let colOptions = colClues.map((c,j)=>{
+    const known=grid.map(row=>row[j]);
+    return genLines(c,N).filter(o=>consistent(o,known));
+  });
+  for(let i=0;i<N;i++) if(rowOptions[i].length===0) return {grid,solved:false,contradiction:true};
+  for(let j=0;j<M;j++) if(colOptions[j].length===0) return {grid,solved:false,contradiction:true};
+
+  let changed=true, guard=0;
+  while(changed && guard<500){
+    changed=false; guard++;
+    for(let i=0;i<N;i++){
+      const known=grid[i];
+      const opts=rowOptions[i].filter(o=>consistent(o,known));
+      rowOptions[i]=opts;
+      if(opts.length===0) return {grid,solved:false,contradiction:true};
+      for(let c=0;c<M;c++){
+        if(known[c]===null){
+          const v0=opts[0][c]; let allSame=true;
+          for(let k=1;k<opts.length;k++){ if(opts[k][c]!==v0){allSame=false;break;} }
+          if(allSame){ grid[i][c]=v0; changed=true; }
+        }
+      }
+    }
+    for(let j=0;j<M;j++){
+      const known=grid.map(row=>row[j]);
+      const opts=colOptions[j].filter(o=>consistent(o,known));
+      colOptions[j]=opts;
+      if(opts.length===0) return {grid,solved:false,contradiction:true};
+      for(let r=0;r<N;r++){
+        if(grid[r][j]===null){
+          const v0=opts[0][r]; let allSame=true;
+          for(let k=1;k<opts.length;k++){ if(opts[k][r]!==v0){allSame=false;break;} }
+          if(allSame){ grid[r][j]=v0; changed=true; }
+        }
+      }
+    }
+  }
+  const solved = grid.every(row=>row.every(v=>v!==null));
+  return {grid,rowOptions,colOptions,solved,contradiction:false};
+}
+
+function countSolutions(rowClues,colClues,limit){
+  const N=rowClues.length, M=colClues.length;
+  let found=0;
+  function search(grid){
+    if(found>=limit) return;
+    const res=propagate(rowClues,colClues,grid);
+    if(res.contradiction) return;
+    if(res.solved){ found++; return; }
+    let ri=-1,ci=-1;
+    outer: for(let i=0;i<N;i++) for(let j=0;j<M;j++){ if(res.grid[i][j]===null){ri=i;ci=j;break outer;} }
+    if(ri===-1) return;
+    for(const v of [1,0]){
+      if(found>=limit) return;
+      const g2=res.grid.map(r=>r.slice());
+      g2[ri][ci]=v;
+      search(g2);
+    }
+  }
+  search(null);
+  return found;
+}
+
+function deriveClues(grid){
+  const M=grid[0].length;
+  const rowClues=grid.map(row=>runsOf(row));
+  const colClues=[];
+  for(let j=0;j<M;j++) colClues.push(runsOf(grid.map(row=>row[j])));
+  return {rowClues,colClues};
+}
+
+function mulberry32(seed){
+  return function(){
+    seed|=0; seed=(seed+0x6D2B79F5)|0;
+    let t=Math.imul(seed^(seed>>>15),1|seed);
+    t=(t+Math.imul(t^(t>>>7),61|t))^t;
+    return ((t^(t>>>14))>>>0)/4294967296;
+  };
+}
+
+function randomSolutionGrid(N,M,rng){
+  const grid=[];
+  for(let i=0;i<N;i++){
+    const row=new Array(M).fill(0);
+    let idx=0;
+    while(idx<M){
+      const doBlock = rng()<0.6 || idx===0;
+      if(doBlock){
+        const maxLen=Math.min(5,M-idx);
+        const len=1+Math.floor(rng()*maxLen);
+        for(let k=0;k<len && idx<M;k++,idx++) row[idx]=1;
+      } else {
+        const maxLen=Math.min(4,M-idx);
+        const len=1+Math.floor(rng()*maxLen);
+        idx+=len;
+      }
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+function generatePuzzle(N,M,seed){
+  const rng=mulberry32(seed);
+  for(let attempt=0; attempt<600; attempt++){
+    const sol=randomSolutionGrid(N,M,rng);
+    const {rowClues,colClues}=deriveClues(sol);
+    const res=propagate(rowClues,colClues);
+    if(res.solved) return {rowClues,colClues,solution:sol};
+  }
+  for(let attempt=0; attempt<200; attempt++){
+    const sol=randomSolutionGrid(N,M,rng);
+    const {rowClues,colClues}=deriveClues(sol);
+    if(countSolutions(rowClues,colClues,2)===1) return {rowClues,colClues,solution:sol};
+  }
+  // last-resort: accept a random grid as-is (astronomically unlikely to be reached)
+  const sol=randomSolutionGrid(N,M,rng);
+  const {rowClues,colClues}=deriveClues(sol);
+  return {rowClues,colClues,solution:sol};
+}
+
+/* =================== the original puzzle from your image =================== */
+
+const ORIGINAL_ROW_CLUES = [[1,3],[2,1],[1,3],[1,1,1,4],[5,3,3],[4,5,1],[1,5,3],[2,7],[1,6],[5,5],[1,1,2],[1,1,2,1],[4,5],[11],[10]];
+const ORIGINAL_COL_CLUES = [[6,3],[2,2,1],[3,1],[2,1,1],[2,6],[1,1,3],[2,4,3],[1,3,2],[6,2],[7,2],[11],[2,3,3],[8,3],[2,3,3],[2,2,4]];
+const ORIGINAL_SOLUTION = [
+".#...###.......",
+"##....#........",
+"#...........###",
+"#.#.#......####",
+"#####.###.###..",
+"####..#####.#..",
+"#.....#####.###",
+".....##.#######",
+"....#...######.",
+"#####...#####..",
+"#...#....##....",
+"#...#....##...#",
+"...####...#####",
+"....###########",
+".....##########",
+].map(s=>s.split('').map(ch=>ch==='#'?1:0));
+
+/* =================== app state / rendering =================== */
+
+const N=15, M=15;
+let puzzle = { rowClues:ORIGINAL_ROW_CLUES, colClues:ORIGINAL_COL_CLUES, solution:ORIGINAL_SOLUTION };
+let cellState = Array.from({length:N},()=>new Array(M).fill(0)); // 0 empty,1 filled,2 crossed
+
+const puzzleEl = document.getElementById('puzzle');
+const statusEl = document.getElementById('status');
+
+function labelCounts(){
+  const LC = Math.max(1, ...puzzle.rowClues.map(c=>c.length));
+  const LR = Math.max(1, ...puzzle.colClues.map(c=>c.length));
+  return {LC,LR};
+}
+
+function sizeBoard(LC,LR){
+  const wrap = document.getElementById('boardWrap');
+  const availW = wrap.clientWidth - 4;
+  const totalCols = LC + 15;
+  let cell = Math.floor(availW/totalCols);
+  cell = Math.max(16, Math.min(32, cell));
+  document.documentElement.style.setProperty('--cell', cell+'px');
+}
+
+function render(){
+  const {LC,LR} = labelCounts();
+  sizeBoard(LC,LR);
+  puzzleEl.innerHTML='';
+  puzzleEl.style.gridTemplateColumns = `repeat(${LC}, var(--cell)) repeat(15, var(--cell))`;
+  puzzleEl.style.gridTemplateRows = `repeat(${LR}, var(--cell)) repeat(15, var(--cell))`;
+
+  // column headers
+  for(let c=0;c<15;c++){
+    const clue = puzzle.colClues[c];
+    const len = clue.length;
+    for(let k=0;k<len;k++){
+      const d=document.createElement('div');
+      d.className='clue col';
+      d.style.gridColumn = (LC+c+1);
+      d.style.gridRow = (LR-len+k+1);
+      d.innerHTML = `<span>${clue[k]}</span>`;
+      puzzleEl.appendChild(d);
+    }
+  }
+  // row headers
+  for(let r=0;r<15;r++){
+    const clue = puzzle.rowClues[r];
+    const len = clue.length;
+    for(let k=0;k<len;k++){
+      const d=document.createElement('div');
+      d.className='clue row';
+      d.style.gridColumn = (LC-len+k+1);
+      d.style.gridRow = (LR+r+1);
+      d.innerHTML = `<span>${clue[k]}</span>`;
+      puzzleEl.appendChild(d);
+    }
+  }
+  // cells
+  for(let r=0;r<15;r++){
+    for(let c=0;c<15;c++){
+      const d=document.createElement('div');
+      d.className='cell';
+      d.dataset.r=r; d.dataset.c=c;
+      d.style.gridColumn=(LC+c+1);
+      d.style.gridRow=(LR+r+1);
+      if((c+1)%5===0 && c!==14) d.classList.add('thickR');
+      if((r+1)%5===0 && r!==14) d.classList.add('thickB');
+      if(r===0) d.classList.add('edgeT');
+      if(c===0) d.classList.add('edgeL');
+      applyCellVisual(d,r,c);
+      d.addEventListener('click', onCellTap);
+      puzzleEl.appendChild(d);
+    }
+  }
+}
+
+function applyCellVisual(d,r,c){
+  const s = cellState[r][c];
+  d.classList.remove('filled','crossed');
+  if(s===1) d.classList.add('filled');
+  else if(s===2) d.classList.add('crossed');
+}
+
+function isSolved(){
+  for(let r=0;r<N;r++){
+    for(let c=0;c<M;c++){
+      const should = puzzle.solution[r][c]===1;
+      const is = cellState[r][c]===1;
+      if(should!==is) return false;
+    }
+  }
+  return true;
+}
+
+let celebrated = false;
+
+function maybeCelebrate(){
+  if(isSolved()){
+    if(!celebrated){
+      celebrated = true;
+      clearErrorHighlights();
+      statusEl.classList.add('show','ok');
+      statusEl.classList.remove('bad');
+      statusEl.textContent = 'Solved correctly! 🎉';
+      launchCelebration();
+    }
+  } else {
+    celebrated = false;
+  }
+}
+
+/* ---- confetti ---- */
+const confettiCanvas = document.getElementById('confettiCanvas');
+const confettiCtx = confettiCanvas.getContext('2d');
+const celebrateEl = document.getElementById('celebrate');
+const CONFETTI_COLORS = ['#3C6E63','#B4392E','#E8B93A','#3E6FBF','#C765B0','#242420'];
+let confettiRAF = null;
+
+function resizeConfettiCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  confettiCanvas.width = Math.floor(window.innerWidth * dpr);
+  confettiCanvas.height = Math.floor(window.innerHeight * dpr);
+  confettiCanvas.style.width = window.innerWidth+'px';
+  confettiCanvas.style.height = window.innerHeight+'px';
+  confettiCtx.setTransform(dpr,0,0,dpr,0,0);
+}
+resizeConfettiCanvas();
+window.addEventListener('resize', resizeConfettiCanvas);
+
+function runConfetti(){
+  const W = window.innerWidth, H = window.innerHeight;
+  const count = 150;
+  const particles = [];
+  for(let i=0;i<count;i++){
+    particles.push({
+      x: Math.random()*W,
+      y: -20 - Math.random()*H*0.5,
+      vx: (Math.random()-0.5)*2.4,
+      vy: 2 + Math.random()*2.5,
+      size: 5 + Math.random()*6,
+      color: CONFETTI_COLORS[Math.floor(Math.random()*CONFETTI_COLORS.length)],
+      rot: Math.random()*Math.PI*2,
+      vr: (Math.random()-0.5)*0.35,
+      shape: Math.random()<0.5 ? 'rect' : 'circle',
+    });
+  }
+  const start = performance.now();
+  const duration = 2600;
+  if(confettiRAF) cancelAnimationFrame(confettiRAF);
+
+  function frame(now){
+    const elapsed = now - start;
+    confettiCtx.clearRect(0,0,W,H);
+    for(const p of particles){
+      p.vy += 0.045;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      confettiCtx.save();
+      confettiCtx.translate(p.x,p.y);
+      confettiCtx.rotate(p.rot);
+      confettiCtx.fillStyle = p.color;
+      if(p.shape==='rect'){
+        confettiCtx.fillRect(-p.size/2, -p.size/3, p.size, p.size*0.6);
+      } else {
+        confettiCtx.beginPath();
+        confettiCtx.arc(0,0,p.size/2,0,Math.PI*2);
+        confettiCtx.fill();
+      }
+      confettiCtx.restore();
+    }
+    if(elapsed < duration){
+      confettiRAF = requestAnimationFrame(frame);
+    } else {
+      confettiCtx.clearRect(0,0,W,H);
+      confettiRAF = null;
+    }
+  }
+  confettiRAF = requestAnimationFrame(frame);
+}
+
+function launchCelebration(){
+  celebrateEl.classList.add('show');
+  runConfetti();
+  clearTimeout(launchCelebration._t);
+  launchCelebration._t = setTimeout(()=>{ celebrateEl.classList.remove('show'); }, 2400);
+}
+celebrateEl.addEventListener('click', ()=>{
+  celebrateEl.classList.remove('show');
+  clearTimeout(launchCelebration._t);
+});
+
+function onCellTap(e){
+  const r=+e.currentTarget.dataset.r, c=+e.currentTarget.dataset.c;
+  cellState[r][c] = (cellState[r][c]+1)%3;
+  e.currentTarget.classList.remove('wrongExtra');
+  applyCellVisual(e.currentTarget,r,c);
+  hideStatus();
+  maybeCelebrate();
+}
+
+function hideStatus(){
+  statusEl.classList.remove('show','ok','bad');
+  statusEl.textContent='';
+}
+
+function clearErrorHighlights(){
+  puzzleEl.querySelectorAll('.wrongExtra').forEach(el=>el.classList.remove('wrongExtra'));
+}
+
+document.getElementById('btnStart').addEventListener('click', ()=>{
+  cellState = Array.from({length:N},()=>new Array(M).fill(0));
+  celebrated = false;
+  clearErrorHighlights();
+  hideStatus();
+  render();
+});
+
+document.getElementById('btnDone').addEventListener('click', ()=>{
+  clearErrorHighlights();
+  let wrong=0;
+  puzzleEl.querySelectorAll('.cell').forEach(el=>{
+    const r=+el.dataset.r, c=+el.dataset.c;
+    if(cellState[r][c]!==1) return; // only judge cells the person actually filled
+    const should = puzzle.solution[r][c]===1;
+    if(!should){ el.classList.add('wrongExtra'); wrong++; }
+  });
+  statusEl.classList.add('show');
+  if(wrong>0){
+    celebrated = false;
+    statusEl.classList.add('bad');
+    statusEl.classList.remove('ok');
+    statusEl.textContent = `${wrong} filled cell${wrong===1?'':'s'} ${wrong===1?'is':'are'} incorrect (see highlights below)`;
+  } else if(isSolved()){
+    statusEl.classList.add('ok');
+    statusEl.classList.remove('bad');
+    statusEl.textContent = 'Solved correctly! 🎉';
+    if(!celebrated){
+      celebrated = true;
+      launchCelebration();
+    }
+  } else {
+    statusEl.classList.add('ok');
+    statusEl.classList.remove('bad');
+    statusEl.textContent = 'All correct so far — keep going!';
+  }
+});
+
+document.getElementById('btnNew').addEventListener('click', ()=>{
+  const seed = Date.now() ^ Math.floor(Math.random()*1e9);
+  try{
+    puzzle = generatePuzzle(N,M,seed);
+  }catch(err){
+    puzzle = generatePuzzle(N,M,Date.now()+1);
+  }
+  cellState = Array.from({length:N},()=>new Array(M).fill(0));
+  celebrated = false;
+  hideStatus();
+  render();
+});
+
+window.addEventListener('resize', ()=>{
+  const {LC,LR}=labelCounts();
+  sizeBoard(LC,LR);
+});
+
+render();
+</script>
+</body>
+</html>
