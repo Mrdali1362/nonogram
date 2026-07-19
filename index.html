@@ -60,7 +60,7 @@
   }
   .clue{
     display:flex; align-items:center; justify-content:center;
-    font-weight:800; color:var(--clue-text); font-size:calc(var(--cell) * 0.44);
+    font-weight:800; color:var(--clue-text); font-size:calc(var(--cell) * 0.58);
     line-height:1; background:var(--clue-bg); cursor:pointer;
   }
   .clue.labelDone{
@@ -104,6 +104,36 @@
     padding:10px 12px calc(10px + env(safe-area-inset-bottom));
     box-shadow:0 -6px 18px rgba(0,0,0,0.06);
   }
+  .sizeToggle{
+    display:flex; gap:8px; justify-content:center; margin:2px 0 12px;
+  }
+  .sizeBtn{
+    padding:8px 20px; font-size:13.5px; font-weight:700; border-radius:999px;
+    border:2px solid var(--clue-text); background:var(--paper); color:var(--clue-text);
+    font-family:inherit; cursor:pointer;
+  }
+  .sizeBtn.active{
+    background:var(--clue-text); color:#fff;
+  }
+  .sizeBtn:active{ transform:scale(0.96); }
+
+  .diffToggle{
+    display:flex; gap:6px; justify-content:center; margin:0 0 4px; flex-wrap:wrap;
+  }
+  .diffBtn{
+    padding:7px 14px; font-size:12.5px; font-weight:700; border-radius:999px;
+    border:2px solid var(--clue-text); background:var(--paper); color:var(--clue-text);
+    font-family:inherit; cursor:pointer;
+  }
+  .diffBtn.active{ background:var(--clue-text); color:#fff; }
+  .diffBtn.locked{
+    border-color:#C9C9D6; color:#9A9AA8; background:#F4F4F8; cursor:not-allowed;
+  }
+  .diffBtn:active{ transform:scale(0.96); }
+  .unlockHint{
+    text-align:center; font-size:11.5px; color:#8A8A97; margin:0 0 10px;
+  }
+  .unlockHint.hidden{ display:none; }
   .btnBar .btnRow{ max-width:536px; margin:0 auto; }
   .btnBar .btnRow2{ max-width:536px; margin:8px auto 0; display:flex; }
 
@@ -186,6 +216,18 @@
     <h1>Nonogram</h1>
     <p class="sub">Tap a cell: fill → X → clear</p>
   </header>
+
+  <div class="sizeToggle">
+    <button class="sizeBtn" id="size10" data-size="10">10×10</button>
+    <button class="sizeBtn active" id="size15" data-size="15">15×15</button>
+  </div>
+
+  <div class="diffToggle">
+    <button class="diffBtn active" id="diffEasy" data-diff="easy">Easy</button>
+    <button class="diffBtn locked" id="diffMedium" data-diff="medium">Medium 🔒</button>
+    <button class="diffBtn locked" id="diffChallenging" data-diff="challenging">Challenging 🔒</button>
+  </div>
+  <p class="unlockHint" id="unlockHint">Solve 5 Easy puzzles to unlock Medium &amp; Challenging (0/5)</p>
 
   <div id="status"></div>
 
@@ -310,8 +352,8 @@ function propagate(rowClues,colClues,initialGrid){
     const known=grid.map(row=>row[j]);
     return genLines(c,N).filter(o=>consistent(o,known));
   });
-  for(let i=0;i<N;i++) if(rowOptions[i].length===0) return {grid,solved:false,contradiction:true};
-  for(let j=0;j<M;j++) if(colOptions[j].length===0) return {grid,solved:false,contradiction:true};
+  for(let i=0;i<N;i++) if(rowOptions[i].length===0) return {grid,solved:false,contradiction:true,rounds:0};
+  for(let j=0;j<M;j++) if(colOptions[j].length===0) return {grid,solved:false,contradiction:true,rounds:0};
 
   let changed=true, guard=0;
   while(changed && guard<500){
@@ -320,7 +362,7 @@ function propagate(rowClues,colClues,initialGrid){
       const known=grid[i];
       const opts=rowOptions[i].filter(o=>consistent(o,known));
       rowOptions[i]=opts;
-      if(opts.length===0) return {grid,solved:false,contradiction:true};
+      if(opts.length===0) return {grid,solved:false,contradiction:true,rounds:guard};
       for(let c=0;c<M;c++){
         if(known[c]===null){
           const v0=opts[0][c]; let allSame=true;
@@ -333,7 +375,7 @@ function propagate(rowClues,colClues,initialGrid){
       const known=grid.map(row=>row[j]);
       const opts=colOptions[j].filter(o=>consistent(o,known));
       colOptions[j]=opts;
-      if(opts.length===0) return {grid,solved:false,contradiction:true};
+      if(opts.length===0) return {grid,solved:false,contradiction:true,rounds:guard};
       for(let r=0;r<N;r++){
         if(grid[r][j]===null){
           const v0=opts[0][r]; let allSame=true;
@@ -344,7 +386,7 @@ function propagate(rowClues,colClues,initialGrid){
     }
   }
   const solved = grid.every(row=>row.every(v=>v!==null));
-  return {grid,rowOptions,colOptions,solved,contradiction:false};
+  return {grid,rowOptions,colOptions,solved,contradiction:false,rounds:guard};
 }
 
 function countSolutions(rowClues,colClues,limit){
@@ -386,20 +428,23 @@ function mulberry32(seed){
   };
 }
 
-function randomSolutionGrid(N,M,rng){
+function randomSolutionGrid(N,M,rng,params){
+  const {blockMin,blockMax,gapMin,gapMax,blockProb} = params;
   const grid=[];
   for(let i=0;i<N;i++){
     const row=new Array(M).fill(0);
     let idx=0;
     while(idx<M){
-      const doBlock = rng()<0.6 || idx===0;
+      const doBlock = rng()<blockProb || idx===0;
       if(doBlock){
-        const maxLen=Math.min(5,M-idx);
-        const len=1+Math.floor(rng()*maxLen);
+        const maxLen=Math.min(blockMax,M-idx);
+        const lo=Math.min(blockMin,maxLen);
+        const len=lo+Math.floor(rng()*(maxLen-lo+1));
         for(let k=0;k<len && idx<M;k++,idx++) row[idx]=1;
       } else {
-        const maxLen=Math.min(4,M-idx);
-        const len=1+Math.floor(rng()*maxLen);
+        const maxLen=Math.min(gapMax,M-idx);
+        const lo=Math.min(gapMin,maxLen);
+        const len=lo+Math.floor(rng()*(maxLen-lo+1));
         idx+=len;
       }
     }
@@ -408,21 +453,63 @@ function randomSolutionGrid(N,M,rng){
   return grid;
 }
 
-function generatePuzzle(N,M,seed){
+// Difficulty tiers, tuned and verified empirically: each tier's generation shape
+// (block/gap sizes) plus an acceptance window on how many logical propagation
+// rounds are needed to fully solve it. More rounds = more cross-referencing
+// between rows and columns = a genuinely harder puzzle. "Easy" still requires
+// at least 2 rounds so it's never a single-pass giveaway.
+function tierParams(tier){
+  if(tier==='easy') return {blockMin:2,blockMax:5,gapMin:1,gapMax:3,blockProb:0.55};
+  if(tier==='medium') return {blockMin:1,blockMax:3,gapMin:1,gapMax:2,blockProb:0.5};
+  return {blockMin:1,blockMax:2,gapMin:1,gapMax:1,blockProb:0.5}; // challenging
+}
+function tierRange(N,tier){
+  if(N<=10){
+    if(tier==='easy') return [2,3];
+    if(tier==='medium') return [4,5];
+    return [5,999];
+  }
+  if(tier==='easy') return [2,4];
+  if(tier==='medium') return [5,6];
+  return [7,999];
+}
+
+function generatePuzzle(N,M,seed,tier){
+  tier = tier || 'easy';
   const rng=mulberry32(seed);
+  const params = tierParams(tier);
+  const [lo,hi] = tierRange(N,tier);
+
+  // pass 1: match the tier's difficulty window exactly (usual case)
+  for(let attempt=0; attempt<3000; attempt++){
+    const sol=randomSolutionGrid(N,M,rng,params);
+    const {rowClues,colClues}=deriveClues(sol);
+    const res=propagate(rowClues,colClues);
+    if(res.solved && res.rounds>=lo && res.rounds<=hi) return {rowClues,colClues,solution:sol};
+  }
+  // pass 2: relax the window, just require it to be logically solvable at all
   for(let attempt=0; attempt<600; attempt++){
-    const sol=randomSolutionGrid(N,M,rng);
+    const sol=randomSolutionGrid(N,M,rng,params);
     const {rowClues,colClues}=deriveClues(sol);
     const res=propagate(rowClues,colClues);
     if(res.solved) return {rowClues,colClues,solution:sol};
   }
+  // pass 3: fall back to the original balanced generator shape
+  const fallbackParams = {blockMin:1,blockMax:5,gapMin:1,gapMax:4,blockProb:0.6};
+  for(let attempt=0; attempt<600; attempt++){
+    const sol=randomSolutionGrid(N,M,rng,fallbackParams);
+    const {rowClues,colClues}=deriveClues(sol);
+    const res=propagate(rowClues,colClues);
+    if(res.solved) return {rowClues,colClues,solution:sol};
+  }
+  // pass 4: verified-unique-by-backtracking (extremely rare fallback)
   for(let attempt=0; attempt<200; attempt++){
-    const sol=randomSolutionGrid(N,M,rng);
+    const sol=randomSolutionGrid(N,M,rng,fallbackParams);
     const {rowClues,colClues}=deriveClues(sol);
     if(countSolutions(rowClues,colClues,2)===1) return {rowClues,colClues,solution:sol};
   }
   // last-resort: accept a random grid as-is (astronomically unlikely to be reached)
-  const sol=randomSolutionGrid(N,M,rng);
+  const sol=randomSolutionGrid(N,M,rng,fallbackParams);
   const {rowClues,colClues}=deriveClues(sol);
   return {rowClues,colClues,solution:sol};
 }
@@ -451,7 +538,10 @@ const ORIGINAL_SOLUTION = [
 
 /* =================== app state / rendering =================== */
 
-const N=15, M=15;
+let N=15, M=15;
+let currentDifficulty = 'easy';
+let easySolvedCount = 0;
+const UNLOCK_THRESHOLD = 5;
 let puzzle = { rowClues:ORIGINAL_ROW_CLUES, colClues:ORIGINAL_COL_CLUES, solution:ORIGINAL_SOLUTION };
 let cellState = Array.from({length:N},()=>new Array(M).fill(0)); // 0 empty,1 filled,2 crossed
 let rowDone = new Array(N).fill(false);
@@ -469,9 +559,9 @@ function labelCounts(){
 function sizeBoard(LC,LR){
   const wrap = document.getElementById('boardWrap');
   const availW = wrap.clientWidth - 4;
-  const totalCols = LC + 15;
+  const totalCols = LC + M;
   let cell = Math.floor(availW/totalCols);
-  cell = Math.max(16, Math.min(32, cell));
+  cell = Math.max(24, Math.min(40, cell));
   document.documentElement.style.setProperty('--cell', cell+'px');
 }
 
@@ -479,11 +569,11 @@ function render(){
   const {LC,LR} = labelCounts();
   sizeBoard(LC,LR);
   puzzleEl.innerHTML='';
-  puzzleEl.style.gridTemplateColumns = `repeat(${LC}, var(--cell)) repeat(15, var(--cell))`;
-  puzzleEl.style.gridTemplateRows = `repeat(${LR}, var(--cell)) repeat(15, var(--cell))`;
+  puzzleEl.style.gridTemplateColumns = `repeat(${LC}, var(--cell)) repeat(${M}, var(--cell))`;
+  puzzleEl.style.gridTemplateRows = `repeat(${LR}, var(--cell)) repeat(${N}, var(--cell))`;
 
   // column headers
-  for(let c=0;c<15;c++){
+  for(let c=0;c<M;c++){
     const clue = puzzle.colClues[c];
     const len = clue.length;
     for(let k=0;k<len;k++){
@@ -499,7 +589,7 @@ function render(){
     }
   }
   // row headers
-  for(let r=0;r<15;r++){
+  for(let r=0;r<N;r++){
     const clue = puzzle.rowClues[r];
     const len = clue.length;
     for(let k=0;k<len;k++){
@@ -515,15 +605,15 @@ function render(){
     }
   }
   // cells
-  for(let r=0;r<15;r++){
-    for(let c=0;c<15;c++){
+  for(let r=0;r<N;r++){
+    for(let c=0;c<M;c++){
       const d=document.createElement('div');
       d.className='cell';
       d.dataset.r=r; d.dataset.c=c;
       d.style.gridColumn=(LC+c+1);
       d.style.gridRow=(LR+r+1);
-      if((c+1)%5===0 && c!==14) d.classList.add('thickR');
-      if((r+1)%5===0 && r!==14) d.classList.add('thickB');
+      if((c+1)%5===0 && c!==M-1) d.classList.add('thickR');
+      if((r+1)%5===0 && r!==N-1) d.classList.add('thickB');
       if(r===0) d.classList.add('edgeT');
       if(c===0) d.classList.add('edgeL');
       applyCellVisual(d,r,c);
@@ -553,15 +643,24 @@ function isSolved(){
 
 let celebrated = false;
 
+function onPuzzleSolved(){
+  celebrated = true;
+  if(currentDifficulty === 'easy' && !unlocked()){
+    easySolvedCount++;
+    updateUnlockUI();
+    saveProgress();
+  }
+  launchCelebration();
+}
+
 function maybeCelebrate(){
   if(isSolved()){
     if(!celebrated){
-      celebrated = true;
       clearErrorHighlights();
       statusEl.classList.add('show','ok');
       statusEl.classList.remove('bad');
       statusEl.textContent = 'Solved correctly! 🎉';
-      launchCelebration();
+      onPuzzleSolved();
     }
   } else {
     celebrated = false;
@@ -738,8 +837,7 @@ document.getElementById('btnDone').addEventListener('click', ()=>{
     statusEl.classList.remove('bad');
     statusEl.textContent = 'Solved correctly! 🎉';
     if(!celebrated){
-      celebrated = true;
-      launchCelebration();
+      onPuzzleSolved();
     }
   } else {
     statusEl.classList.add('ok');
@@ -748,12 +846,16 @@ document.getElementById('btnDone').addEventListener('click', ()=>{
   }
 });
 
-document.getElementById('btnNew').addEventListener('click', ()=>{
+function unlocked(){ return easySolvedCount >= UNLOCK_THRESHOLD; }
+
+function generateAndLoad(size, difficulty){
+  N = size; M = size;
+  currentDifficulty = difficulty;
   const seed = Date.now() ^ Math.floor(Math.random()*1e9);
   try{
-    puzzle = generatePuzzle(N,M,seed);
+    puzzle = generatePuzzle(N,M,seed,currentDifficulty);
   }catch(err){
-    puzzle = generatePuzzle(N,M,Date.now()+1);
+    puzzle = generatePuzzle(N,M,Date.now()+1,currentDifficulty);
   }
   cellState = Array.from({length:N},()=>new Array(M).fill(0));
   rowDone = new Array(N).fill(false);
@@ -761,7 +863,56 @@ document.getElementById('btnNew').addEventListener('click', ()=>{
   celebrated = false;
   hideStatus();
   render();
+}
+
+document.getElementById('btnNew').addEventListener('click', ()=>{
+  generateAndLoad(N, currentDifficulty);
 });
+
+const sizeButtons = document.querySelectorAll('.sizeBtn');
+function updateSizeButtonsUI(){
+  sizeButtons.forEach(b=>{
+    b.classList.toggle('active', parseInt(b.dataset.size,10)===N);
+  });
+}
+sizeButtons.forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const s = parseInt(b.dataset.size,10);
+    if(s===N) return;
+    generateAndLoad(s, currentDifficulty);
+    updateSizeButtonsUI();
+  });
+});
+
+const diffButtons = document.querySelectorAll('.diffBtn');
+const unlockHint = document.getElementById('unlockHint');
+function updateUnlockUI(){
+  const isUnlocked = unlocked();
+  diffButtons.forEach(b=>{
+    const diff = b.dataset.diff;
+    if(diff !== 'easy'){
+      b.classList.toggle('locked', !isUnlocked);
+      b.textContent = (diff==='medium' ? 'Medium' : 'Challenging') + (isUnlocked ? '' : ' 🔒');
+    }
+    b.classList.toggle('active', diff === currentDifficulty);
+  });
+  if(isUnlocked){
+    unlockHint.classList.add('hidden');
+  } else {
+    unlockHint.classList.remove('hidden');
+    unlockHint.textContent = `Solve 5 Easy puzzles to unlock Medium & Challenging (${easySolvedCount}/${UNLOCK_THRESHOLD})`;
+  }
+}
+diffButtons.forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const diff = b.dataset.diff;
+    if(diff !== 'easy' && !unlocked()) return; // locked
+    if(diff === currentDifficulty) return;
+    generateAndLoad(N, diff);
+    updateUnlockUI();
+  });
+});
+updateUnlockUI();
 
 window.addEventListener('resize', ()=>{
   const {LC,LR}=labelCounts();
@@ -778,6 +929,40 @@ document.getElementById('helpClose').addEventListener('click', ()=>{
 helpOverlay.addEventListener('click', (e)=>{
   if(e.target === helpOverlay) helpOverlay.classList.remove('show');
 });
+
+/* =================== persistence (unlock progress) =================== */
+// Uses the artifact storage API when available (persists across sessions here
+// in Claude). If it's unavailable — e.g. the file has been saved and opened
+// as a standalone page outside Claude — this quietly no-ops and the app just
+// keeps working with in-memory-only progress for that session.
+const PROGRESS_KEY = 'nonogram-progress';
+
+let saveProgressTimer = null;
+function saveProgress(){
+  if(!window.storage) return;
+  clearTimeout(saveProgressTimer);
+  saveProgressTimer = setTimeout(()=>{
+    window.storage.set(PROGRESS_KEY, JSON.stringify({ easySolvedCount }), false)
+      .catch(()=>{ /* best-effort; ignore failures */ });
+  }, 300);
+}
+
+async function loadProgress(){
+  if(!window.storage) return;
+  try{
+    const result = await window.storage.get(PROGRESS_KEY, false);
+    if(result && result.value){
+      const data = JSON.parse(result.value);
+      if(typeof data.easySolvedCount === 'number' && data.easySolvedCount > easySolvedCount){
+        easySolvedCount = data.easySolvedCount;
+      }
+    }
+  }catch(err){
+    // no saved progress yet, or storage not available right now — stay at default
+  }
+  updateUnlockUI();
+}
+loadProgress();
 
 render();
 </script>
